@@ -77,7 +77,7 @@ class Leaf final : public Node {
  public:
   Leaf(const std::string& name) : Node(name) { }
 
-  /** Setter for action_ */
+  /** Setter for action. */
   std::function<Status ()>& action() { return action_; }
 
   Status tick() const override { return action_(); }

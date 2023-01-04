@@ -44,22 +44,21 @@ int main() {
   auto a = bt::Selector("a");
   auto b = bt::Sequence("b");
 
+  // Children can be set via constructor or children() setter.
   auto leaf_success = bt::Sequence("leaf_success", { action_success });
-  auto leaf_fail = bt::Sequence("leaf_fail", { action_fail });
-
-  const auto l = std::make_unique<bt::Sequence>(leaf_success);
+  auto leaf_fail = bt::Sequence("leaf_fail");
+  leaf_fail.children() = { action_fail };
 
   // Actions can be set to class member functions via lambdas and std::bind.
-  Agent agent(false); auto c = bt::Sequence("c");
-  c.children() = { [&agent] () { return agent.increment(); } };
+  Agent agent(false);
+  auto c = bt::Sequence("c", { [&agent] () { return agent.increment(); } });
 
-  auto d = bt::Sequence("d");
-  d.children() = { std::bind(&Agent::increment, &agent) };
+  auto d = bt::Sequence("d", { std::bind(&Agent::increment, &agent) });
 
   a.children() = { leaf_fail, leaf_success };
   b.children() = { leaf_success };
 
-  auto e = bt::CacheStatus(bt::Status::SUCCESS, "e");
+  auto e = bt::FreezeStatus(bt::Status::SUCCESS, "e");
   e.children() = { [&agent] () { return agent.increment(); } };
 
   // References to the same node can be used to update the same node from
@@ -71,6 +70,8 @@ int main() {
     const auto status = root();
     std::cout << status << std::endl;
   }
+
+  std::cout << root.repr() << std::endl;
 
   return 0;
 }

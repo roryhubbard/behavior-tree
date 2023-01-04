@@ -1,49 +1,41 @@
 #pragma once
 
-#include <algorithm>
 #include <functional>
-#include <memory>
-#include <ostream>
 #include <string>
 #include <vector>
 
 namespace behavior_tree {
 
-enum Status { RUNNING, SUCCESS, FAILURE };
+enum Status { IDLE, RUNNING, SUCCESS, FAILURE };
 
 class Node {
  public:
-  Node(const std::string& name) : name_(name) { }
-
   /** Setter for children. */
-  std::vector<std::shared_ptr<const Node>>& children() { return children_; }
+  std::vector<std::function<Status ()>>& children() { return children_; }
 
-  /** Execute this node. */
-  virtual Status tick() const = 0;
-
-  friend std::ostream& operator<<(std::ostream& os, const Node& node) {
-    os << node.str() << " " << node.name_ << " { ";
-    std::for_each(node.children_.begin(), node.children_.end(),
-        [&os] (const auto& n) { os << *n; });
-    os << "} ";
-    return os;
-  }
+  virtual Status operator()() = 0;
 
  protected:
+  Node(const std::string& name = "",
+       const std::vector<std::function<Status ()>>& children = {})
+      : name_(name), children_(children) { }
+
   std::string name_;
 
-  std::vector<std::shared_ptr<const Node>> children_;
+  std::vector<std::function<Status ()>> children_;
 
-  virtual std::string str() const = 0;
+  std::string str() const { return name_; };
 };
 
 class Sequence final : public Node {
  public:
-  Sequence(const std::string& name) : Node(name) { }
+  Sequence(const std::string& name = "",
+           const std::vector<std::function<Status ()>>& children = {})
+      : Node(name, children) { }
 
-  Status tick() const override {
+  Status operator()() override {
     for (const auto& child : children_) {
-      const auto status = child->tick();
+      const auto status = child();
       if (status == Status::RUNNING || status == Status::FAILURE) {
         return status;
       }
@@ -52,16 +44,18 @@ class Sequence final : public Node {
   }
 
  private:
-  std::string str() const override { return "SEQUENCE"; }
+  std::string str() const { return Node::str() + " (SEQUENCE)"; }
 };
 
 class Selector final : public Node {
  public:
-  Selector(const std::string& name) : Node(name) { }
+  Selector(const std::string& name = "",
+           const std::vector<std::function<Status ()>>& children = {})
+      : Node(name, children) { }
 
-  Status tick() const override {
+  Status operator()() override {
     for (const auto& child : children_) {
-      const auto status = child->tick();
+      const auto status = child();
       if (status == Status::RUNNING || status == Status::SUCCESS) {
         return status;
       }
@@ -70,22 +64,29 @@ class Selector final : public Node {
   }
 
  private:
-  std::string str() const override { return "SELECTOR"; }
+  std::string str() const { return Node::str() + " (SELECTOR)"; }
 };
 
-class Leaf final : public Node {
+class CacheStatus final : public Node {
  public:
-  Leaf(const std::string& name) : Node(name) { }
+  CacheStatus(const Status status_to_cache, const std::string& name = "",
+              const std::vector<std::function<Status ()>>& children = {})
+      : Node(name, children), status_to_cache_(status_to_cache) { }
 
-  /** Setter for action. */
-  std::function<Status ()>& action() { return action_; }
-
-  Status tick() const override { return action_(); }
+  Status operator()() override {
+    if (current_status_ == status_to_cache_) {
+      return current_status_;
+    }
+    current_status_ = children_.front()();
+    return current_status_;
+  }
 
  private:
-  std::function<Status ()> action_;
+  std::string str() const { return Node::str() + " (CACHE_STATUS)"; }
 
-  std::string str() const override { return "LEAF"; }
+  Status current_status_;
+
+  Status status_to_cache_;
 };
 
 }  // namespace behavior_tree

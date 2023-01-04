@@ -8,18 +8,18 @@ namespace bt = behavior_tree;
 
 class Agent {
  public:
-  Agent(const bool val) : val_(val) { }
+  Agent(const int val) : val_(val) { }
 
-  bt::Status flip_val() {
-    std::cout << "Agent::flip_val" << std::endl;
-    val_ = !val_;
-    return bt::SUCCESS;
+  bt::Status increment() {
+    std::cout << "Agent::increment" << std::endl;
+    ++val_;
+    return val_ > 2 ? bt::SUCCESS : bt::FAILURE;
   }
 
-  [[nodiscard]] const bool& val() const { return val_; }
+  [[nodiscard]] const int& val() const { return val_; }
 
  private:
-  bool val_;
+  int val_;
 };
 
 bt::Status action_success() {
@@ -35,34 +35,42 @@ bt::Status action_fail() {
 int main() {
   /**
    *                    root(SEQ)
-   *             /            \     \  \
-   *       a(SEL)            b(SEQ)  c  d
+   *             /            \     \  \  \  \
+   *       a(SEL)            b(SEQ)  c  d  e  e
    *        / \                |
    * leaf_fail leaf_success  leaf_success
    */
-  const auto root = std::make_shared<bt::Sequence>("root");
-  const auto a = std::make_shared<bt::Selector>("a");
-  const auto b = std::make_shared<bt::Sequence>("b");
+  auto root = bt::Sequence("root");
+  auto a = bt::Selector("a");
+  auto b = bt::Sequence("b");
 
-  const auto leaf_success = std::make_shared<bt::Leaf>("leaf_success");
-  leaf_success->action() = action_success;
-  const auto leaf_fail = std::make_shared<bt::Leaf>("leaf_fail");
-  leaf_fail->action() = action_fail;
+  auto leaf_success = bt::Sequence("leaf_success", { action_success });
+  auto leaf_fail = bt::Sequence("leaf_fail", { action_fail });
+
+  const auto l = std::make_unique<bt::Sequence>(leaf_success);
 
   // Actions can be set to class member functions via lambdas and std::bind.
-  Agent agent(false);
-  const auto c = std::make_shared<bt::Leaf>("c");
-  c->action() = [&agent] () { return agent.flip_val(); };
+  Agent agent(false); auto c = bt::Sequence("c");
+  c.children() = { [&agent] () { return agent.increment(); } };
 
-  const auto d = std::make_shared<bt::Leaf>("d");
-  d->action() = std::bind(&Agent::flip_val, &agent);
+  auto d = bt::Sequence("d");
+  d.children() = { std::bind(&Agent::increment, &agent) };
 
-  a->children() = { leaf_fail, leaf_success };
-  b->children() = { leaf_success };
-  root->children() = { a, b, c, d };
+  a.children() = { leaf_fail, leaf_success };
+  b.children() = { leaf_success };
 
-  root->tick();
+  auto e = bt::CacheStatus(bt::Status::SUCCESS, "e");
+  e.children() = { [&agent] () { return agent.increment(); } };
 
-  std::cout << *root << std::endl;
+  // References to the same node can be used to update the same node from
+  // different children. This is only useful for nodes that have state.
+  root.children() = { a, b, c, d, std::ref(e), std::ref(e) };
+
+  for (int i = 0; i < 5; ++i) {
+    std::cout << "root tick" << std::endl;
+    const auto status = root();
+    std::cout << status << std::endl;
+  }
+
   return 0;
 }

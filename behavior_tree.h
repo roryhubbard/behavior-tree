@@ -99,14 +99,13 @@ class Selector final : public Node {
 
 /**
  * Once a certain status is achieved, always return that status on subsequent
- * executions without executing any children. This node is like a "decorator".
- * It should only have one child, although this is not enforced.
+ * executions without executing any children.
  */
 class FreezeStatus final : public Sequence {
  public:
   FreezeStatus(const Status freeze_status, const std::string& name = "",
-               const std::function<Status ()>& child = {})
-      : Sequence(name, { child }), freeze_status_(freeze_status) { }
+               const std::vector<std::function<Status ()>>& children = {})
+      : Sequence(name, children), freeze_status_(freeze_status) { }
 
   Status operator()() override {
     if (current_status_ == freeze_status_) {

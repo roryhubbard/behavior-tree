@@ -51,15 +51,15 @@ int main() {
 
   // Actions can be set to class member functions via lambdas and std::bind.
   Agent agent(false);
-  auto c = bt::Sequence("c", { [&agent] () { return agent.increment(); } });
+  auto c = bt::Sequence("c", { [&agent]() { return agent.increment(); } });
 
   auto d = bt::Sequence("d", { std::bind(&Agent::increment, &agent) });
 
   a.children() = { leaf_fail, leaf_success };
   b.children() = { leaf_success };
 
-  auto e = bt::FreezeStatus(bt::Status::SUCCESS, "e");
-  e.children() = { [&agent] () { return agent.increment(); } };
+  auto e = bt::FreezeStatus(bt::Status::SUCCESS, "e", {
+      [&agent]() { return agent.increment(); } });
 
   // References to the same node can be used to update the same node from
   // different children. This is only useful for nodes that have state.

@@ -32,13 +32,12 @@ class Node {
     r += " { " + str() + ":";
     std::for_each(children_.begin(), children_.end(),
         [&r] (const auto& child) {
-      if (const auto sequence = child.template target<Sequence>()) {
-        r += sequence->repr();
-      } else if (const auto selector = child.template target<Selector>()) {
-        r += selector->repr();
-      } else if (
-          const auto freeze_status = child.template target<FreezeStatus>()) {
-        r += freeze_status->repr();
+      if (const auto node = child.template target<Sequence>()) {
+        r += node->repr();
+      } else if (const auto node = child.template target<Selector>()) {
+        r += node->repr();
+      } else if (const auto node = child.template target<FreezeStatus>()) {
+        r += node->repr();
       } else {
         r += " { LEAF },";
       }
